@@ -5,22 +5,30 @@ import { Op } from "sequelize";
 import { sign } from "jsonwebtoken";
 import dayjs from "dayjs";
 import { UserTokens } from "../models/userTokens";
-import { getDifferenceOfTwoDatesInTime } from "../utils/common";
+import { getDifferenceOfTwoDatesInTime, userPayloadFunction } from "../utils/common";
+import { userDataReturn, CookieOptions, AuthCookieOptions, userPayload, Tokens } from "../types/dbtypes";
+import { Response } from "express";
 
-const generateToken = (userData: string, secret: string) => {
-  const userDataNew = JSON.parse(userData);
+
+
+export const generateTokens = (user: userPayload, role: string): Tokens => {
+  const {id, username, email, name} = user;
+  
+  const JWT_SECRET = role == 'ADMIN' ? process.env.ADMIN_SECRET : process.env.CLIENT_SECRET
+  const REFRESH_JWT_SECRET = role == 'ADMIN' ? process.env.REFRESH_ADMIN_SECRET : process.env.REFRESH_CLIENT_SECRET
 
   const payload = {
-    id: userDataNew.id,
-    username: userDataNew.username,
-    email: userDataNew.email,
+    id: id,
+    username: username,
+    email: email,
+    name: name
   };
 
-  const options = {
-    expiresIn: Number(process.env.EXPIRES_IN) * 60,
-  };
+  const token = sign(payload, JWT_SECRET as string, { expiresIn: process.env.JWT_EXPIRATION });
 
-  return sign(payload, secret, options);
+  const refreshToken = sign(payload, REFRESH_JWT_SECRET as string, { expiresIn: process.env.REFRESH_TOKEN_EXPIRATION });
+
+  return {token, refreshToken}
 };
 
 export const loginUser = async (
@@ -143,23 +151,13 @@ export const loginUser = async (
     }
 
     const userData = user.toJSON();
+    const userPayloadData = userPayloadFunction(userData);
 
-    let token;
-    let refreshToken;
+    let tokens;
     if (role == "ADMIN") {
-      token = await generateToken(
-        JSON.stringify(userData),
-        process.env.ADMIN_SECRET as string
-      );
-
-      refreshToken = await generateToken(JSON.stringify(userData), process.env.REFRESH_ADMIN_SECRET as string)
+      tokens = await generateTokens(userPayloadData, role);
     } else if (role == "CLIENT") {
-      token = await generateToken(
-        JSON.stringify(userData),
-        process.env.CLIENT_SECRET as string
-      );
-
-      refreshToken = await generateToken(JSON.stringify(userData), process.env.REFRESH_CLIENT_SECRET as string)
+      tokens = await generateTokens(userPayloadData, role);
     }
 
     if (userAuth && userAuth.loginRetryLimit) {
@@ -173,7 +171,7 @@ export const loginUser = async (
     }
 
     let expire = dayjs()
-      .add(Number(process.env.EXPIRES_IN), "hours");
+      .add(Number(process.env.EXPIRES_IN), "day");
 
     let existingToken = await UserTokens.findOne({
       where: {
@@ -183,7 +181,7 @@ export const loginUser = async (
 
     if(existingToken){
       await UserTokens.update({
-        refreshToken: refreshToken,
+        refreshToken: tokens?.refreshToken,
         refreshTokenExpiredTime : expire.toDate(),
         isRefreshTokenExpired: false,
       }, {
@@ -194,17 +192,17 @@ export const loginUser = async (
     }else{
       await UserTokens.create({
         userId: user.id,
-        refreshToken: refreshToken,
+        refreshToken: tokens?.refreshToken,
         refreshTokenExpiredTime : expire.toDate(),
         isRefreshTokenExpired: false,
         addedBy: user.id
       })
     }
 
-    let userToReturn = {
-      ...userData,
-      token,
-      refreshToken
+    let userToReturn : userDataReturn = {
+      userdata : {...userData},
+      token : tokens?.token as string,
+      refreshToken : tokens?.refreshToken as string
     };
 
     return {
@@ -214,4 +212,27 @@ export const loginUser = async (
   } catch (error) {
     console.log("Error: " + error);
   }
+};
+
+export const setAuthCookies = (res: Response, token: string, refreshToken: string, options: AuthCookieOptions = {}) => {
+  const defaultOptions : CookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // Ensure cookies are only sent over HTTPS in production
+    sameSite: 'strict' // Adjust according to your needs ('lax' or 'none' if cross-site)
+  };
+
+  const tokenOptions : CookieOptions = {
+    ...defaultOptions,
+    maxAge: 1000 * 60 * 15, // Example: 15 minutes for token
+    ...options.tokenOptions
+  };
+
+  const refreshTokenOptions : CookieOptions = {
+    ...defaultOptions,
+    maxAge: 1000 * 60 * 60 * 24 , // Example: 1 day for refresh token
+    ...options.refreshTokenOptions
+  };
+
+  res.cookie('token', token, tokenOptions);
+  res.cookie('refreshToken', refreshToken, refreshTokenOptions);
 };

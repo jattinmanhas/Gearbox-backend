@@ -6,8 +6,7 @@ const verifyCallback =
   (
     req: Request,
     resolve: () => void,
-    reject: (reason: string) => void,
-    role: string
+    reject: (reason: string) => void
   ) =>
   async (err: Error, user: UserAttributes, info: any) => {
     if (err || info || !user) {
@@ -22,13 +21,17 @@ const verifyCallback =
   };
 
 const authMiddleware =
-  (role: string) => async (req: Request, res: Response, next: NextFunction) => {
+  (role: string, isRefresh: boolean) => async (req: Request, res: Response, next: NextFunction) => {
     const authenticate = (rule: string) => new Promise<void>((resolve, reject) => {
-        passport.authenticate(rule, { session: false }, verifyCallback(req, resolve, reject, role))(req, res, next);
+        passport.authenticate(rule, { session: false }, verifyCallback(req, resolve, reject))(req, res, next);
       });
       try {
         if (role === 'ADMIN') {
-          await authenticate('admin-rule');
+          if(!isRefresh){
+            await authenticate('admin-rule');
+          }else{
+            await authenticate('admin-refresh-token')
+          }
         } else if (role === 'CLIENT') {
           await authenticate('client-rule');
         }

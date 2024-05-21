@@ -58,3 +58,33 @@ export interface UserTokenAttributes {
   isDeleted: boolean;
   [key: string]: unknown;
 }
+
+export interface userDataReturn{
+  userdata: object;
+  token: string;
+  refreshToken: string;
+}
+
+export interface CookieOptions {
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'strict' | 'lax' | 'none';
+  maxAge?: number;
+}
+
+export interface AuthCookieOptions {
+  tokenOptions?: CookieOptions;
+  refreshTokenOptions?: CookieOptions;
+}
+
+export interface userPayload{
+  id: number,
+  username: string,
+  email: string,
+  name?: string
+}
+
+export interface Tokens{
+  token: string;
+  refreshToken: string;
+}

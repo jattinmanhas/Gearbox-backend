@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import { User } from "../models/user";
 import * as crypto from 'crypto';
+import { UserAttributes, userPayload } from "../types/dbtypes";
 
 export async function checkUsernameorEmailExists(
   value: string,
@@ -36,4 +37,17 @@ export function getDifferenceOfTwoDatesInTime(
     return `${hours} hour, ${minutes} minute and ${seconds} second`;
   }
   return `${minutes} minute and ${seconds} second`;
+}
+
+export function userPayloadFunction(user: any): userPayload{
+  const {id, username, email, name} = user;
+  ;
+  const userPayload: userPayload = {
+    id: id,
+    username : username,
+    email: email,
+    name: name
+  }
+
+  return userPayload;
 }

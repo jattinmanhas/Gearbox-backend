@@ -1,10 +1,11 @@
-import { Strategy as JwtStrategy ,ExtractJwt, StrategyOptions } from "passport-jwt";
+import { Strategy as JwtStrategy , StrategyOptions } from "passport-jwt";
 import passport from "passport";
 import { User } from "../models/user";
+import { Request } from "express";
 
 export const adminPassportStrategy = async(passport: passport.PassportStatic) => {
     const options: StrategyOptions = {
-        jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        jwtFromRequest: cookieExtractor,
         secretOrKey: process.env.ADMIN_SECRET as string,
     }
 
@@ -28,3 +29,11 @@ export const adminPassportStrategy = async(passport: passport.PassportStatic) =>
 
     passport.use('admin-rule', strategy);
 }
+
+const cookieExtractor = function(req: Request) {
+    let token = null;
+    if (req && req.cookies) {
+        token = req.cookies.token;
+    }
+    return token;
+};

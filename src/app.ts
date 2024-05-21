@@ -5,6 +5,9 @@ import { router } from './routes';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import { adminPassportStrategy } from './config/passportAdminStrategy';
+import { adminRefreshTokenStrategy } from './config/passportAdminRefreshTokenStrategy';
+
+import cors from 'cors';
 
 import sequelize from './database/dbConnection'; // Import the Sequelize instance
 
@@ -12,7 +15,19 @@ import sequelize from './database/dbConnection'; // Import the Sequelize instanc
 const app = express();
 const PORT = process.env.PORT;
 
+const corsOptions = {
+    origin: 'http://localhost:3000', // Replace with your frontend URL
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+    optionsSuccessStatus: 204
+  };
+  
+  app.use(cors(corsOptions));
+
+
+
 adminPassportStrategy(passport);
+adminRefreshTokenStrategy(passport);
 
 app.use(express.json());
 app.use(express.urlencoded({extended: false}))

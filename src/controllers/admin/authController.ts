@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { User } from "../../models/user";
 import sequelize from "../../database/dbConnection";
-import { checkUsernameorEmailExists } from "../../utils/common";
-import { loginUser } from "../../services/auth";
+import { checkUsernameorEmailExists, userPayloadFunction } from "../../utils/common";
+import { generateTokens, loginUser, setAuthCookies } from "../../services/auth";
 import { UserTokens } from "../../models/userTokens";
-import { UserAttributes } from "../../types/dbtypes";
+import { Tokens, UserAttributes, userDataReturn, userPayload } from "../../types/dbtypes";
 /**
  * @description : login with username and password
  * @param {Object} req : request for login
@@ -39,6 +39,12 @@ export const login = async (req: Request, res: Response) => {
     if(login?.flag){
       return res.status(400).json({message: login.data})
     }
+
+    const loginData = login?.data as userDataReturn;
+    const token = loginData.token;
+    const refreshToken = loginData.refreshToken;
+
+    setAuthCookies(res, token, refreshToken);
 
     return res.status(200).json({ data: login?.data, message: "Login Successful"});
 
@@ -116,7 +122,7 @@ export const register = async (req: Request, res: Response) => {
 export const logout = async(req: Request, res : Response) => {
   try{
       const user = req.user as UserAttributes;
-      const userId = user.id;
+      const userId  = user.id;
  
     let existingToken = await UserTokens.findOne({
       where: {
@@ -143,4 +149,50 @@ export const logout = async(req: Request, res : Response) => {
   catch(error){
     console.log(error);
   }
+}
+
+
+export const forgotPassword = (req: Request, res: Response) => {
+  console.log(req.user);
+
+  const tokenCookie = req.cookies.token;
+  console.log(tokenCookie);
+}
+
+export const refreshToken = async (req: Request, res : Response) => {
+  try{
+    const userData : userPayload = userPayloadFunction(req.user);
+
+    if(!userData){
+      return res.status(200).json({message: "Failed to turn user into userPayload"});
+    }
+  
+    // genrate new tokens
+    const tokens : Tokens = generateTokens(userData, "ADMIN");
+  
+    // set tokens again in the cookies
+    setAuthCookies(res, tokens.token, tokens.refreshToken);
+  
+    // Update Refresh token in the database
+    const now = new Date();
+    now.setDate(now.getDate() + 1);
+  
+    await UserTokens.update({
+      refreshToken: tokens?.refreshToken,
+      refreshTokenExpiredTime : now,
+      isRefreshTokenExpired: false,
+      updatedBy: userData.id,
+      updatedAt: new Date()
+    }, {
+      where: {
+        userId: userData.id
+      }
+    })
+    
+    return res.status(200).json({message: "New tokens generated Successfully..."})
+  
+  }catch(error){
+    res.status(500).json({message: "Server error"});
+  }
+
 }
