@@ -1,5 +1,4 @@
 import * as Joi from "joi";
-import { User } from "../../models/user";
 
 export const userRegistrationSchema = Joi.object({
   username: Joi.string().alphanum().min(3).max(30).required().messages({
@@ -20,4 +19,24 @@ export const userLoginSchema = Joi.object({
     password: Joi.string().min(6).required(),  // Minimum 6 characters, required
   }).or('username', 'email').required(); // username or email only one is required...
   
+
+export const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().required() // Valid email formatting and required...
+})
+
+export const resetPasswordSchema = Joi.object({
+  password: Joi.string()
+    .min(8)
+    .required()
+    .label('Password'),
+  confirmPassword: Joi.string()
+    .valid(Joi.ref('password')) // Remove unnecessary nesting
+    .required()
+    .label('Confirm Password')
+    .messages({
+      'any.only': '{{#label}} does not match the password',
+    }),
+});
+
+
 

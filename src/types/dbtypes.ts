@@ -29,7 +29,7 @@ export interface UserAuthSettingsAttributes {
   loginOTP?: string;
   expiredTimeOfLoginOTP?: Date;
   resetPasswordCode?: string;
-  expiredTimeOfResetPasswordCode?: Date;
+  expiredTimeOfResetPasswordCode?: Date | null;
   loginRetryLimit?: number;
   loginReactiveTime?: Date;
   isActive: boolean;

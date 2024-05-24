@@ -8,7 +8,7 @@ import { UserTokens } from "../models/userTokens";
 import { getDifferenceOfTwoDatesInTime, userPayloadFunction } from "../utils/common";
 import { userDataReturn, CookieOptions, AuthCookieOptions, userPayload, Tokens } from "../types/dbtypes";
 import { Response } from "express";
-
+import { hash, compare } from "bcrypt";
 
 
 export const generateTokens = (user: userPayload, role: string): Tokens => {
@@ -236,3 +236,54 @@ export const setAuthCookies = (res: Response, token: string, refreshToken: strin
   res.cookie('token', token, tokenOptions);
   res.cookie('refreshToken', refreshToken, refreshTokenOptions);
 };
+
+
+export const resetNewPassword = async (userId: number, newPassword: string) => {
+  try{
+    newPassword = await hash(newPassword, 12);
+    
+    let updatedUser = await User.update({
+      password: newPassword,
+      addedBy: userId,
+      updatedBy: userId, 
+      updatedAt: dayjs(new Date())
+    }, {
+      where: {
+        id: userId,
+        isActive: true,
+        isDeleted: false
+      }
+    })
+
+    if (!updatedUser) {
+      return {
+        flag: true,
+        data: "Failed to reset password...",
+      };
+    }
+
+    await UserAuthSettings.update({
+      resetPasswordCode: "",
+      expiredTimeOfResetPasswordCode: null,
+      loginRetryLimit: 0,
+      updatedAt: dayjs(new Date()),
+      updatedBy: userId
+    }, {
+      where: {
+        id: userId,
+        isActive: true,
+        isDeleted: false
+      }
+    })
+
+    // mail to send password changed successfully...
+
+    return {
+      flag: false,
+      data: "Password reset successfully",
+    };
+
+  }catch(error){
+    throw new Error("Server Error..." + error);
+  }
+}

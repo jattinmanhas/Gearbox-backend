@@ -9,6 +9,7 @@ const verifyCallback =
     reject: (reason: string) => void
   ) =>
   async (err: Error, user: UserAttributes, info: any) => {
+    console.log(info)
     if (err || info || !user) {
       return reject("Unauthorized User");
     }

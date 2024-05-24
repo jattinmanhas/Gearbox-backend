@@ -51,3 +51,7 @@ export function userPayloadFunction(user: any): userPayload{
 
   return userPayload;
 }
+
+export async function generateResetToken(): Promise<string> {
+  return crypto.randomBytes(32).toString('hex');
+}

@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
 import { User } from "../../models/user";
 import sequelize from "../../database/dbConnection";
-import { checkUsernameorEmailExists, userPayloadFunction } from "../../utils/common";
-import { generateTokens, loginUser, setAuthCookies } from "../../services/auth";
+import { checkUsernameorEmailExists, generateResetToken, userPayloadFunction } from "../../utils/common";
+import { generateTokens, loginUser, resetNewPassword, setAuthCookies } from "../../services/auth";
 import { UserTokens } from "../../models/userTokens";
 import { Tokens, UserAttributes, userDataReturn, userPayload } from "../../types/dbtypes";
+import { UserAuthSettings } from "../../models/userAuthSettings";
+import { getUserResetTokenAndDetails } from "../../utils/queries/userQueries";
+import dayjs from "dayjs";
 /**
  * @description : login with username and password
  * @param {Object} req : request for login
@@ -123,10 +126,15 @@ export const logout = async(req: Request, res : Response) => {
   try{
       const user = req.user as UserAttributes;
       const userId  = user.id;
+
+      res.clearCookie('token', { httpOnly: true});
+      res.clearCookie('refreshToken', { httpOnly: true });    
  
     let existingToken = await UserTokens.findOne({
       where: {
-        userId: userId
+        userId: userId,
+        isDeleted: false,
+        isActive: true
       }
     })
 
@@ -138,7 +146,9 @@ export const logout = async(req: Request, res : Response) => {
         updatedBy : userId,
       }, {
         where: {
-          userId: userId
+          userId: userId,
+          isDeleted: false,
+          isActive: true  
         }
       })
     }
@@ -152,11 +162,94 @@ export const logout = async(req: Request, res : Response) => {
 }
 
 
-export const forgotPassword = (req: Request, res: Response) => {
-  console.log(req.user);
+export const forgotPassword = async (req: Request, res: Response) => {
+  try{
+    const {email} = req.body;
 
-  const tokenCookie = req.cookies.token;
-  console.log(tokenCookie);
+    const user = await User.findOne({where : {email: email, isDeleted: false, isActive: true}})
+    if(!user){
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const resetToken = await generateResetToken();
+    const resetTokenExpiration = new Date(Date.now() + 60 * 60 * 1000); // 1hour
+
+    const resetTokendbUpdate = await UserAuthSettings.update({
+      resetPasswordCode: resetToken,
+      expiredTimeOfResetPasswordCode: resetTokenExpiration
+    },{
+      where: {
+        userId: user.id,
+        isDeleted: false,
+        isActive: true
+      }
+    })
+
+    // send an email -> pending...
+
+    if(resetTokendbUpdate){
+      return res.status(200).json({message: "Please Reset Your password from your email..."})
+    }
+
+  }catch(error){
+    res.status(500).json("Server Error");
+  }
+}
+
+export const verifyResetTokenToResetPassword = async (req: Request, res: Response) => {
+  try{
+    const {token} = req.params;
+    if(!token){
+      return res.status(400).json({ message :'Password Reset Token is Missing' });
+    }
+
+    const userData = await getUserResetTokenAndDetails(token)
+    if(userData && userData.expiredTimeOfResetPasswordCode){
+      if (dayjs(new Date()).isAfter(dayjs(userData.expiredTimeOfResetPasswordCode))) {// link expire
+        return res.status(400).json({ message :'Your reset password link is expired or invalid' });
+      }
+    }
+    else{
+      return res.status(400).json({ message :'Invalid Code' });
+    }
+
+    return res.status(200).json({ message : 'Token verified' });
+
+  }catch(error){
+    res.status(500).json({message: error})
+  }
+
+}
+
+export const resetPassword = async(req: Request, res: Response) => {
+  try{
+    const {token} = req.params;
+    const {password} = req.body;
+
+    if(!token){
+      return res.status(400).json({ message :'Password Reset Token is Missing' });
+    }
+
+    const userData = await getUserResetTokenAndDetails(token)
+    if(userData && userData.expiredTimeOfResetPasswordCode){
+      if (dayjs(new Date()).isAfter(dayjs(userData.expiredTimeOfResetPasswordCode))) {// link expire
+        return res.status(400).json({ message :'Your reset password link is expired or invalid' });
+      }
+    }
+    else{
+      return res.status(400).json({ message :'Invalid Code' });
+    }
+
+    let response = await resetNewPassword(userData.id, password);
+    if (response.flag){
+      return res.status(400).json({ message :response.data });
+    }
+
+    return res.status(200).json({message: response.data})
+
+  }catch(error){
+    res.status(500).json({message: error})
+  }
 }
 
 export const refreshToken = async (req: Request, res : Response) => {
@@ -185,7 +278,9 @@ export const refreshToken = async (req: Request, res : Response) => {
       updatedAt: new Date()
     }, {
       where: {
-        userId: userData.id
+        userId: userData.id,
+        isDeleted: false,
+        isActive: true
       }
     })
     
