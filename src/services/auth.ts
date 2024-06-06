@@ -5,30 +5,47 @@ import { Op } from "sequelize";
 import { sign } from "jsonwebtoken";
 import dayjs from "dayjs";
 import { UserTokens } from "../models/userTokens";
-import { getDifferenceOfTwoDatesInTime, userPayloadFunction } from "../utils/common";
-import { userDataReturn, CookieOptions, AuthCookieOptions, userPayload, Tokens } from "../types/dbtypes";
+import {
+  getDifferenceOfTwoDatesInTime,
+  userPayloadFunction,
+} from "../utils/common";
+import {
+  userDataReturn,
+  CookieOptions,
+  AuthCookieOptions,
+  userPayload,
+  Tokens,
+} from "../types/dbtypes";
 import { Response } from "express";
 import { hash, compare } from "bcrypt";
-
+import { findOne } from "../utils/queries/orm/ormQueries";
 
 export const generateTokens = (user: userPayload, role: string): Tokens => {
-  const {id, username, email, name} = user;
-  
-  const JWT_SECRET = role == 'ADMIN' ? process.env.ADMIN_SECRET : process.env.CLIENT_SECRET
-  const REFRESH_JWT_SECRET = role == 'ADMIN' ? process.env.REFRESH_ADMIN_SECRET : process.env.REFRESH_CLIENT_SECRET
+  const { id, username, email, name } = user;
+
+  const JWT_SECRET =
+    role == "ADMIN" ? process.env.ADMIN_SECRET : process.env.CLIENT_SECRET;
+  const REFRESH_JWT_SECRET =
+    role == "ADMIN"
+      ? process.env.REFRESH_ADMIN_SECRET
+      : process.env.REFRESH_CLIENT_SECRET;
 
   const payload = {
     id: id,
     username: username,
     email: email,
-    name: name
+    name: name,
   };
 
-  const token = sign(payload, JWT_SECRET as string, { expiresIn: process.env.JWT_EXPIRATION });
+  const token = sign(payload, JWT_SECRET as string, {
+    expiresIn: process.env.JWT_EXPIRATION,
+  });
 
-  const refreshToken = sign(payload, REFRESH_JWT_SECRET as string, { expiresIn: process.env.REFRESH_TOKEN_EXPIRATION });
+  const refreshToken = sign(payload, REFRESH_JWT_SECRET as string, {
+    expiresIn: process.env.REFRESH_TOKEN_EXPIRATION,
+  });
 
-  return {token, refreshToken}
+  return { token, refreshToken };
 };
 
 export const loginUser = async (
@@ -46,9 +63,7 @@ export const loginUser = async (
     where.isActive = true;
     where.isDeleted = false;
 
-    let user = await User.findOne({
-      where: where,
-    });
+    let user = await findOne(User, where);
 
     if (!user) {
       return {
@@ -57,7 +72,7 @@ export const loginUser = async (
       };
     }
 
-    let userAuth = await UserAuthSettings.findOne({
+    let userAuth = await findOne(UserAuthSettings, {
       where: {
         userId: user.id,
       },
@@ -170,39 +185,41 @@ export const loginUser = async (
       );
     }
 
-    let expire = dayjs()
-      .add(Number(process.env.EXPIRES_IN), "day");
+    let expire = dayjs().add(Number(process.env.EXPIRES_IN), "day");
 
-    let existingToken = await UserTokens.findOne({
+    let existingToken = await findOne(UserTokens, {
       where: {
-        userId: user.id
-      }
-    })
+        userId: user.id,
+      },
+    });
 
-    if(existingToken){
-      await UserTokens.update({
-        refreshToken: tokens?.refreshToken,
-        refreshTokenExpiredTime : expire.toDate(),
-        isRefreshTokenExpired: false,
-      }, {
-        where: {
-          userId: user.id
+    if (existingToken) {
+      await UserTokens.update(
+        {
+          refreshToken: tokens?.refreshToken,
+          refreshTokenExpiredTime: expire.toDate(),
+          isRefreshTokenExpired: false,
+        },
+        {
+          where: {
+            userId: user.id,
+          },
         }
-      })
-    }else{
+      );
+    } else {
       await UserTokens.create({
         userId: user.id,
         refreshToken: tokens?.refreshToken,
-        refreshTokenExpiredTime : expire.toDate(),
+        refreshTokenExpiredTime: expire.toDate(),
         isRefreshTokenExpired: false,
-        addedBy: user.id
-      })
+        addedBy: user.id,
+      });
     }
 
-    let userToReturn : userDataReturn = {
-      userdata : {...userData},
-      token : tokens?.token as string,
-      refreshToken : tokens?.refreshToken as string
+    let userToReturn: userDataReturn = {
+      userdata: { ...userData },
+      token: tokens?.token as string,
+      refreshToken: tokens?.refreshToken as string,
     };
 
     return {
@@ -214,46 +231,53 @@ export const loginUser = async (
   }
 };
 
-export const setAuthCookies = (res: Response, token: string, refreshToken: string, options: AuthCookieOptions = {}) => {
-  const defaultOptions : CookieOptions = {
+export const setAuthCookies = (
+  res: Response,
+  token: string,
+  refreshToken: string,
+  options: AuthCookieOptions = {}
+) => {
+  const defaultOptions: CookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Ensure cookies are only sent over HTTPS in production
-    sameSite: 'strict' // Adjust according to your needs ('lax' or 'none' if cross-site)
+    secure: process.env.NODE_ENV === "production", // Ensure cookies are only sent over HTTPS in production
+    sameSite: "strict", // Adjust according to your needs ('lax' or 'none' if cross-site)
   };
 
-  const tokenOptions : CookieOptions = {
+  const tokenOptions: CookieOptions = {
     ...defaultOptions,
     maxAge: 1000 * 60 * 15, // Example: 15 minutes for token
-    ...options.tokenOptions
+    ...options.tokenOptions,
   };
 
-  const refreshTokenOptions : CookieOptions = {
+  const refreshTokenOptions: CookieOptions = {
     ...defaultOptions,
-    maxAge: 1000 * 60 * 60 * 24 , // Example: 1 day for refresh token
-    ...options.refreshTokenOptions
+    maxAge: 1000 * 60 * 60 * 24, // Example: 1 day for refresh token
+    ...options.refreshTokenOptions,
   };
 
-  res.cookie('token', token, tokenOptions);
-  res.cookie('refreshToken', refreshToken, refreshTokenOptions);
+  res.cookie("token", token, tokenOptions);
+  res.cookie("refreshToken", refreshToken, refreshTokenOptions);
 };
 
-
 export const resetNewPassword = async (userId: number, newPassword: string) => {
-  try{
+  try {
     newPassword = await hash(newPassword, 12);
-    
-    let updatedUser = await User.update({
-      password: newPassword,
-      addedBy: userId,
-      updatedBy: userId, 
-      updatedAt: dayjs(new Date())
-    }, {
-      where: {
-        id: userId,
-        isActive: true,
-        isDeleted: false
+
+    let updatedUser = await User.update(
+      {
+        password: newPassword,
+        addedBy: userId,
+        updatedBy: userId,
+        updatedAt: dayjs(new Date()),
+      },
+      {
+        where: {
+          id: userId,
+          isActive: true,
+          isDeleted: false,
+        },
       }
-    })
+    );
 
     if (!updatedUser) {
       return {
@@ -262,19 +286,22 @@ export const resetNewPassword = async (userId: number, newPassword: string) => {
       };
     }
 
-    await UserAuthSettings.update({
-      resetPasswordCode: "",
-      expiredTimeOfResetPasswordCode: null,
-      loginRetryLimit: 0,
-      updatedAt: dayjs(new Date()),
-      updatedBy: userId
-    }, {
-      where: {
-        id: userId,
-        isActive: true,
-        isDeleted: false
+    await UserAuthSettings.update(
+      {
+        resetPasswordCode: "",
+        expiredTimeOfResetPasswordCode: null,
+        loginRetryLimit: 0,
+        updatedAt: dayjs(new Date()),
+        updatedBy: userId,
+      },
+      {
+        where: {
+          id: userId,
+          isActive: true,
+          isDeleted: false,
+        },
       }
-    })
+    );
 
     // mail to send password changed successfully...
 
@@ -282,8 +309,7 @@ export const resetNewPassword = async (userId: number, newPassword: string) => {
       flag: false,
       data: "Password reset successfully",
     };
-
-  }catch(error){
+  } catch (error) {
     throw new Error("Server Error..." + error);
   }
-}
+};

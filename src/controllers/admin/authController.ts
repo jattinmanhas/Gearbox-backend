@@ -6,8 +6,9 @@ import { generateTokens, loginUser, resetNewPassword, setAuthCookies } from "../
 import { UserTokens } from "../../models/userTokens";
 import { Tokens, UserAttributes, userDataReturn, userPayload } from "../../types/dbtypes";
 import { UserAuthSettings } from "../../models/userAuthSettings";
-import { getUserResetTokenAndDetails } from "../../utils/queries/userQueries";
+import { getUserResetTokenAndDetails } from "../../utils/queries/custom/userQueries";
 import dayjs from "dayjs";
+import { findOne } from "../../utils/queries/orm/ormQueries";
 /**
  * @description : login with username and password
  * @param {Object} req : request for login
@@ -130,7 +131,7 @@ export const logout = async(req: Request, res : Response) => {
       res.clearCookie('token', { httpOnly: true});
       res.clearCookie('refreshToken', { httpOnly: true });    
  
-    let existingToken = await UserTokens.findOne({
+    let existingToken = await findOne(UserTokens, {
       where: {
         userId: userId,
         isDeleted: false,
@@ -166,7 +167,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
   try{
     const {email} = req.body;
 
-    const user = await User.findOne({where : {email: email, isDeleted: false, isActive: true}})
+    const user = await findOne(User, {where : {email: email}});
+
+    console.log(user);
     if(!user){
       return res.status(404).json({ message: 'User not found' });
     }
@@ -188,8 +191,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
     // send an email -> pending...
 
     if(resetTokendbUpdate){
-      return res.status(200).json({message: "Please Reset Your password from your email..."})
-    }
+      return res.status(200).json({message: "Password change link sent to your Email successfully...Please Reset Your password from your email..."})
+    } 
 
   }catch(error){
     res.status(500).json("Server Error");
@@ -210,7 +213,7 @@ export const verifyResetTokenToResetPassword = async (req: Request, res: Respons
       }
     }
     else{
-      return res.status(400).json({ message :'Invalid Code' });
+      return res.status(400).json({ message :'Invalid Token' });
     }
 
     return res.status(200).json({ message : 'Token verified' });

@@ -1,4 +1,4 @@
-import sequelize from "../../database/dbConnection";
+import sequelize from "../../../database/dbConnection";
 import { QueryTypes } from "sequelize";
 
 interface userResetTokenDetails{
@@ -10,7 +10,7 @@ interface userResetTokenDetails{
 
 export const getUserResetTokenAndDetails = async (resetToken: string) : Promise<userResetTokenDetails | false> => {
   try {
-    const [results , metadata] = await sequelize.query(
+    const [results] = await sequelize.query(
       `
         SELECT "user"."email", "user"."id", "userAuth"."resetPasswordCode", "userAuth"."expiredTimeOfResetPasswordCode"
         FROM "users" as "user"
