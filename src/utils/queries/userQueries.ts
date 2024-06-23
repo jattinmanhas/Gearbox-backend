@@ -1,4 +1,4 @@
-import sequelize from "../../../database/dbConnection";
+import sequelize from "../../database/dbConnection";
 import { QueryTypes } from "sequelize";
 
 interface userResetTokenDetails{

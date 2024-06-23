@@ -10,6 +10,8 @@ import { adminRefreshTokenStrategy } from './config/passportAdminRefreshTokenStr
 import cors from 'cors';
 
 import sequelize from './database/dbConnection'; // Import the Sequelize instance
+import { errorHandlerMiddleware } from './middlewares/errorHandlingMiddleware';
+import { ApiError } from './utils/handlers/apiError';
 
 
 const app = express();
@@ -36,9 +38,13 @@ app.use(cookieParser())
 sequelize.sync({force: false}).then(() => {
     console.log('connected to the database');
 }).catch((error) => {
-    console.log(error);
+    throw new ApiError(500, "Could not connect to the Database...")
 }).finally(() => {
+    // All routes...
     app.use(router);
+
+    // Error handling middleware...
+    app.use(errorHandlerMiddleware);
 
     app.listen(PORT, () => {
         console.log('server started on port '+ PORT);

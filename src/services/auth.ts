@@ -18,7 +18,6 @@ import {
 } from "../types/dbtypes";
 import { Response } from "express";
 import { hash, compare } from "bcrypt";
-import { findOne } from "../utils/queries/orm/ormQueries";
 
 export const generateTokens = (user: userPayload, role: string): Tokens => {
   const { id, username, email, name } = user;
@@ -63,7 +62,7 @@ export const loginUser = async (
     where.isActive = true;
     where.isDeleted = false;
 
-    let user = await findOne(User, where);
+    let user = await User.findOne(where);
 
     if (!user) {
       return {
@@ -72,7 +71,7 @@ export const loginUser = async (
       };
     }
 
-    let userAuth = await findOne(UserAuthSettings, {
+    let userAuth = await UserAuthSettings.findOne({
       where: {
         userId: user.id,
       },
@@ -187,7 +186,7 @@ export const loginUser = async (
 
     let expire = dayjs().add(Number(process.env.EXPIRES_IN), "day");
 
-    let existingToken = await findOne(UserTokens, {
+    let existingToken = await UserTokens.findOne({
       where: {
         userId: user.id,
       },
