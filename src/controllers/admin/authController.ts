@@ -60,7 +60,14 @@ export const login = asyncHandler(
     const token = loginData.token;
     const refreshToken = loginData.refreshToken;
 
-    setAuthCookies(res, token, refreshToken);
+    console.log(token);
+    console.log(refreshToken);
+    // setAuthCookies(res, token, refreshToken); 
+    console.log("inside cookie");
+    res.cookie("auth cookie", "setting token cookie here...", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+    });
 
     return res.status(200).json(new ApiResponse(200, login?.data, "Login Successful"));
   }
@@ -314,3 +321,13 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
 
     return res.status(200).json(new ApiResponse(200, userData, "New Tokens Generated Successfully..."));
 });
+
+
+export const getUserDetails = asyncHandler(async (req: Request, res: Response) => {
+  const userData: userPayload = userPayloadFunction(req.user);
+  if(!userData){
+    throw new ApiError(404, "User not Found...");
+  }
+
+  return res.status(200).json(new ApiResponse(200, userData, "User Tokens Verififed Successfully..."));
+})

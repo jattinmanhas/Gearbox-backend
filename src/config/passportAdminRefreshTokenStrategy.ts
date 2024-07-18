@@ -30,9 +30,10 @@ export const adminRefreshTokenStrategy = async (passport: passport.PassportStati
 }
 
 const RefreshTokenExtractor = (req: Request) => {
-    let token = null;
+    let token = null;    
     if(req && req.cookies){
         token = req.cookies.refreshToken;
+        console.log("Refresh token : " + token)
     }
 
     return token;

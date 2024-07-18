@@ -61,8 +61,9 @@ export const loginUser = async (
 
     where.isActive = true;
     where.isDeleted = false;
+    
 
-    let user = await User.findOne(where);
+    let user = await User.findOne({where});
 
     if (!user) {
       return {
@@ -238,8 +239,8 @@ export const setAuthCookies = (
 ) => {
   const defaultOptions: CookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // Ensure cookies are only sent over HTTPS in production
-    sameSite: "strict", // Adjust according to your needs ('lax' or 'none' if cross-site)
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax", 
   };
 
   const tokenOptions: CookieOptions = {

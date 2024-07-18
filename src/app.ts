@@ -17,14 +17,21 @@ import { ApiError } from './utils/handlers/apiError';
 const app = express();
 const PORT = process.env.PORT;
 
-const corsOptions = {
-    origin: 'http://localhost:3000', // Replace with your frontend URL
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-    optionsSuccessStatus: 204
-  };
-  
-  app.use(cors(corsOptions));
+app.use(cors({
+    origin: 'http://localhost:3000/', // Update this to match your frontend origin
+    credentials: true
+}));
+
+app.use(cookieParser())
+
+// app.get('/shop', (req, res) => {
+    // console.log('inside cookie');
+    // res.cookie('token', 'someTokenValue', {
+    //     httpOnly: true,
+    //     secure: process.env.NODE_ENV === 'production' // Use secure cookies in production
+    // });
+    // res.status(200).send('Cookie set');
+// });
 
 
 
@@ -33,7 +40,8 @@ adminRefreshTokenStrategy(passport);
 
 app.use(express.json());
 app.use(express.urlencoded({extended: false}))
-app.use(cookieParser())
+app.use(router);
+
 
 sequelize.sync({force: false}).then(() => {
     console.log('connected to the database');
@@ -41,7 +49,6 @@ sequelize.sync({force: false}).then(() => {
     throw new ApiError(500, "Could not connect to the Database...")
 }).finally(() => {
     // All routes...
-    app.use(router);
 
     // Error handling middleware...
     app.use(errorHandlerMiddleware);

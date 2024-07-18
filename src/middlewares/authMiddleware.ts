@@ -9,7 +9,6 @@ const verifyCallback =
     reject: (reason: string) => void
   ) =>
   async (err: Error, user: UserAttributes, info: any) => {
-    console.log(info)
     if (err || info || !user) {
       return reject("Unauthorized User");
     }
@@ -22,23 +21,26 @@ const verifyCallback =
   };
 
 const authMiddleware =
-  (role: string, isRefresh: boolean) => async (req: Request, res: Response, next: NextFunction) => {
+  (role: string) => async (req: Request, res: Response, next: NextFunction) => {
     const authenticate = (rule: string) => new Promise<void>((resolve, reject) => {
         passport.authenticate(rule, { session: false }, verifyCallback(req, resolve, reject))(req, res, next);
       });
       try {
         if (role === 'ADMIN') {
-          if(!isRefresh){
-            await authenticate('admin-rule');
-          }else{
-            await authenticate('admin-refresh-token')
-          }
+          console.log(req.body)
+            if(req.body.refreshToken === true){
+              console.log("should only go in refresh token now");
+              await authenticate('admin-refresh-token');
+            }else{
+              console.log("should not go here")
+              await authenticate('admin-rule');
+            }
         } else if (role === 'CLIENT') {
           await authenticate('client-rule');
         }
         next();
       } catch (err) {
-        return res.sendStatus(401); // Assuming `unAuthorized` sends a 401 status
+        return res.sendStatus(401);
       }
   };
 
